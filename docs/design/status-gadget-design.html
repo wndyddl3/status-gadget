@@ -1,0 +1,634 @@
+<title>Status Gadget Design</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Nunito+Sans:wght@400;600&family=Nunito:wght@600;800&display=swap">
+<style>
+:root{
+  --ground:#F3F1F7; --surface:#FFFFFF; --ink:#2F2B3D; --muted:#6E6880; --line:#DDD8E6;
+  --accent:#7B6BD8; --accent-soft:#ECE8FB; --stage:#2B3038;
+  --sans:"Nunito Sans","Segoe UI",system-ui,sans-serif;
+  --round:"Nunito","Segoe UI",system-ui,sans-serif;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){ --ground:#17151D; --surface:#211E29; --ink:#ECE9F3; --muted:#A39DB5; --line:#34303F; --accent:#A89CF0; --accent-soft:#2C2740; --stage:#0F1115; }
+}
+:root[data-theme="dark"]{ --ground:#17151D; --surface:#211E29; --ink:#ECE9F3; --muted:#A39DB5; --line:#34303F; --accent:#A89CF0; --accent-soft:#2C2740; --stage:#0F1115; }
+*{box-sizing:border-box}
+body{background:var(--ground);color:var(--ink);font-family:var(--sans);font-size:15px;line-height:1.65;margin:0;padding-block:36px 56px;padding-inline:20px}
+.wrap{max-width:1040px;margin:0 auto;display:flex;flex-direction:column;gap:22px}
+h1{font-family:var(--round);font-weight:800;font-size:26px;margin:0;text-wrap:balance}
+h2{font-family:var(--round);font-weight:800;font-size:15px;margin:0}
+p{margin:0}
+.muted{color:var(--muted)}
+.layout{display:grid;grid-template-columns:1fr 290px;gap:18px;align-items:start}
+@media (max-width:820px){.layout{grid-template-columns:1fr}}
+.stage{position:relative;background:var(--stage);border-radius:12px;min-height:470px;overflow:hidden;
+  background-image:radial-gradient(rgba(255,255,255,.05) 1px,transparent 1px);background-size:18px 18px}
+.stage-note{position:absolute;left:14px;bottom:10px;font-size:12px;color:#8C95A1}
+#gadget{position:absolute;touch-action:none}
+#gadget canvas{display:block;filter:drop-shadow(0 6px 14px rgba(0,0,0,.35));cursor:grab}
+#gadget canvas.resize{cursor:nwse-resize}
+#gadget canvas:active{cursor:grabbing}
+#gadget canvas.resize:active{cursor:nwse-resize}
+#gadget canvas.resize-x,#gadget canvas.resize-x:active{cursor:ew-resize}
+.menu{position:absolute;z-index:5;background:#272333;border:1px solid #3A3548;border-radius:8px;padding:4px;min-width:150px;box-shadow:0 10px 24px rgba(0,0,0,.4);font-size:13.5px;color:#ECE9F3}
+.menu button{all:unset;display:flex;justify-content:space-between;gap:12px;width:100%;box-sizing:border-box;padding:6px 10px;border-radius:5px;cursor:pointer}
+.menu button:hover,.menu button:focus-visible{background:#34304A}
+.menu hr{border:0;border-top:1px solid #3A3548;margin:4px 2px}
+#reopen{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);font:inherit;background:#272333;color:#ECE9F3;border:0;border-radius:999px;padding:8px 18px;cursor:pointer}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:18px;display:flex;flex-direction:column;gap:18px}
+.group{display:flex;flex-direction:column;gap:10px}
+.slider{display:grid;grid-template-columns:44px 1fr 58px;align-items:center;gap:10px;font-size:14px}
+.slider label{font-family:var(--round);font-weight:800;font-size:13px;color:var(--muted)}
+.slider output{text-align:right;font-variant-numeric:tabular-nums;font-family:var(--round);font-weight:700}
+input[type=range]{width:100%;accent-color:var(--accent)}
+.seg{display:flex;gap:6px;flex-wrap:wrap}
+.seg button{font:inherit;font-size:13.5px;border:1px solid var(--line);background:transparent;color:var(--ink);border-radius:999px;padding:5px 12px;cursor:pointer}
+.seg button[aria-pressed="true"]{background:var(--accent-soft);border-color:var(--accent);color:var(--accent)}
+.seg button:focus-visible,#reopen:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.mood{background:var(--accent-soft);border-radius:8px;padding:10px 12px;font-size:14px}
+.mood b{color:var(--accent)}
+.size{font-size:13px;color:var(--muted);font-variant-numeric:tabular-nums}
+.tips{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px 22px;font-size:14px}
+.tips div{display:flex;gap:8px}
+.tips b{font-family:var(--round);font-weight:800;white-space:nowrap}
+.stage.bright{background:linear-gradient(135deg,#D7E8F2 0%,#F4EAD8 55%,#E9D9EC 100%)}
+.stage.bright .stage-note{color:#5B6470}
+/* settings window: styled like the gadget's own dark menu */
+.dialog{position:absolute;left:14px;bottom:34px;z-index:6;width:236px;background:#272333;border:1px solid #3A3548;border-radius:10px;
+  box-shadow:0 12px 28px rgba(0,0,0,.45);color:#ECE9F3;font-size:13.5px;padding:10px 14px 14px;display:flex;flex-direction:column;gap:10px;user-select:none}
+.dlg-head{display:flex;justify-content:space-between;align-items:center;font-family:var(--round);font-weight:800;cursor:grab;touch-action:none;user-select:none}
+.dlg-head:active{cursor:grabbing}
+.dlg-head button{all:unset;cursor:pointer;width:24px;height:24px;display:grid;place-items:center;border-radius:5px;color:#A39DB5;font-size:17px}
+.dlg-head button:hover,.dlg-head button:focus-visible{background:#34304A;color:#ECE9F3}
+.dlg-size{display:flex;flex-direction:column;gap:4px}
+.dlg-size label{display:flex;justify-content:space-between;color:#A39DB5}
+.dlg-size output{color:#ECE9F3;font-variant-numeric:tabular-nums}
+.dlg-size input{accent-color:#9585F0}
+.dlg-check{display:flex;align-items:center;gap:8px;cursor:pointer}
+.dlg-check input{accent-color:#9585F0;width:15px;height:15px;margin:0}
+</style>
+
+<div class="wrap">
+  <div>
+    <h1>Status Gadget Design</h1>
+    <p class="muted">Interactive prototype, design v13. New: a third view, <b>One line</b>, puts every number, Houdini sessions included, on one thin bar with no pet. Transparent background shows its panel only while you point at the gadget. The numbers are simulated with the controls on the right.</p>
+  </div>
+
+  <div class="tips">
+    <div><b>Click the yard</b><span>The pet walks there</span></div>
+    <div><b>Click the pet</b><span>Hearts + a hop</span></div>
+    <div><b>Drag</b><span>Move the gadget</span></div>
+    <div><b>Drag bottom-right corner</b><span>Resize</span></div>
+    <div><b>Right-click</b><span>Open the menu</span></div>
+    <div><b>View button</b><span>Full → Compact → One line</span></div>
+    <div><b>Point at the gadget</b><span>Transparent mode: its panel appears</span></div>
+    <div><b>Click a number</b><span>Switch RAM between GB and %</span></div>
+    <div><b>Right-click → Settings…</b><span>Status size, hide pet, transparent background</span></div>
+  </div>
+
+  <div class="layout">
+    <div class="stage" id="stage">
+      <div id="gadget"><canvas id="cv"></canvas></div>
+      <button id="reopen" hidden>Reopen gadget</button>
+      <div class="dialog" id="settings" role="dialog" aria-labelledby="set-title" hidden>
+        <div class="dlg-head"><span id="set-title">Settings</span><button type="button" id="set-close" aria-label="Close settings">×</button></div>
+        <div class="dlg-size">
+          <label for="opt-size"><span>Status size</span><output id="opt-size-o">100%</output></label>
+          <input id="opt-size" type="range" min="75" max="150" step="5" value="100">
+        </div>
+        <label class="dlg-check"><input type="checkbox" id="opt-pet" checked> Show pet</label>
+        <label class="dlg-check"><input type="checkbox" id="opt-clear"> Transparent background</label>
+      </div>
+      <span class="stage-note">Pretend this is your desktop</span>
+    </div>
+
+    <div class="panel">
+      <div class="group">
+        <h2>Test controls</h2>
+        <div class="slider"><label for="cpu">CPU</label><input id="cpu" type="range" min="0" max="100" value="34"><output id="cpu-o"></output></div>
+        <div class="slider"><label for="gpu">GPU</label><input id="gpu" type="range" min="0" max="100" value="28"><output id="gpu-o"></output></div>
+        <div class="slider"><label for="ram">RAM</label><input id="ram" type="range" min="0" max="100" value="36"><output id="ram-o"></output></div>
+      </div>
+      <div class="group">
+        <h2>Houdini</h2>
+        <div class="seg" id="hou-seg">
+          <button type="button" data-hou="0" aria-pressed="false">Off</button>
+          <button type="button" data-hou="1" aria-pressed="false">1 session</button>
+          <button type="button" data-hou="2" aria-pressed="true">2 sessions</button>
+          <button type="button" data-hou="4" aria-pressed="false">4 sessions</button>
+        </div>
+      </div>
+      <div class="group">
+        <h2>Presets</h2>
+        <div class="seg" id="presets">
+          <button type="button" data-p="5,3,22">Idle</button>
+          <button type="button" data-p="34,28,36">Normal</button>
+          <button type="button" data-p="92,97,71">Busy</button>
+          <button type="button" data-p="30,25,96">Low memory</button>
+        </div>
+      </div>
+      <div class="group">
+        <h2>Sky preview <span class="muted" style="font-weight:600">(prototype only)</span></h2>
+        <div class="seg" id="sky-seg">
+          <button type="button" data-s="auto" aria-pressed="true">Auto</button>
+          <button type="button" data-s="morning" aria-pressed="false">Morning</button>
+          <button type="button" data-s="day" aria-pressed="false">Day</button>
+          <button type="button" data-s="evening" aria-pressed="false">Evening</button>
+          <button type="button" data-s="night" aria-pressed="false">Night</button>
+        </div>
+      </div>
+      <div class="group">
+        <h2>Desktop preview <span class="muted" style="font-weight:600">(prototype only)</span></h2>
+        <div class="seg" id="wall-seg">
+          <button type="button" data-w="dark" aria-pressed="true">Dark wallpaper</button>
+          <button type="button" data-w="bright" aria-pressed="false">Bright wallpaper</button>
+        </div>
+      </div>
+      <div class="mood" id="mood" aria-live="polite"></div>
+      <div class="group">
+        <h2>View size</h2>
+        <div class="seg" id="zoom-seg">
+          <button type="button" data-z="1.5" aria-pressed="true">Large</button>
+          <button type="button" data-z="1" aria-pressed="false">Actual size</button>
+        </div>
+        <p class="size" id="size-o"></p>
+      </div>
+      <p class="muted" style="font-size:13px">RAM warning levels: 50% noticing, 70% uneasy, 85% "!" sign, 95% "!!" danger. Gadget size limits: width 220–400, yard height 56–130 (default 280 × 80). One line view: drag its right end to resize sideways, up to its full content. Narrower than that, session names shorten first ("Hou 2"), then Houdini values drop one at a time from the end (a session's RAM, then its CPU). At the smallest only CPU, GPU and RAM remain. While you drag, the bar follows the pointer; when you let go, it glides in to hug what it shows. Reset size makes it fit its content again. Use <b>Actual size</b> to see a long line in full. In this prototype the pet dozes off after <b>5 seconds</b> of idle (1 minute in the real tool). The yard sky follows your current time of day.</p>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ---------- layout constants ---------- */
+const W_MIN=220, W_MAX=400, W_DEF=280, YH_MIN=56, YH_MAX=130, YH_DEF=80;
+const ROWS_FULL=82, ROWS_COMPACT=32, H_HOU=24, RAM_TOTAL=64;
+const BUSY_AT=85, SLEEP_BELOW=15, SLEEP_AFTER=5;
+const C={panel:'#1E1B26',edge:'#34303F',btn:'#272333',track:'#2E2A3A',label:'#8F88A8',ink:'#ECE9F3',ok:'#6FCF9C',warn:'#F2C166',crit:'#F08B7E',
+  pet:'#6CC486',petDark:'#55AA6E',eye:'#1E1B26',cheek:'#F4A9A0',hat:'#9585F0',star:'#FFD86B',magic:'#B9A8FF',heart:'#F27C8E',z:'#E6E1F5',wand:'#C9A27A'};
+const SKY={morning:{top:'#21474F',bottom:'#9C7482',floor:'#C9A3AE'},day:{top:'#34617F',bottom:'#5E8BA8',floor:'#9DBDD2'},
+  evening:{top:'#3E3160',bottom:'#B8714F',floor:'#D89A78'},night:{top:'#10132A',bottom:'#1C2140',floor:'#3A4170'}};
+const PHASE_NAME={morning:'Morning',day:'Day',evening:'Evening',night:'Night'};
+/* star / firefly positions are stored as fractions of the yard so they follow resizing */
+const STARS=[[.08,.15],[.18,.33],[.31,.1],[.46,.25],[.6,.08],[.73,.3],[.84,.15],[.25,.58],[.68,.55]];
+const FLIES=[[.2,.52,0],[.42,.4,1.7],[.64,.6,3.1],[.84,.46,4.4]];
+
+const $=id=>document.getElementById(id);
+const cv=$('cv'), ctx=cv.getContext('2d'), gadget=$('gadget'), stage=$('stage');
+const st={cpu:34,gpu:28,ram:36,hou:2,hover:false,pct:false,pet:true,clear:false,sz:1,view:'full',topmost:true,Z:1.5,sky:'auto',W:W_DEF,YH:YH_DEF,fitKey:''};
+const pet={x:140,dir:1,phase:0,pause:0,glance:0,target:null,jumpT:-1,hearts:[],sparks:[]};
+let mood='walk', calmSince=null, t=0, last=performance.now(), hoverGrip=false;
+
+/* ---------- geometry helpers (all in gadget pixels) ---------- */
+const isLine=()=>st.view==='line';
+const YB=()=>st.pet&&!isLine()?8+st.YH:0;  // yard bottom (0 when the pet is hidden or in one-line view)
+const GROUND=()=>8+st.YH-24;          // pet body centre when standing
+const XMIN=30, XMAX=()=>st.W-30;      // pet walking range
+/* the status area (rows + Houdini) is drawn in its own units and scaled by st.sz */
+const rowsH=()=>isLine()?LINE_H:st.view==='compact'?ROWS_COMPACT:ROWS_FULL;
+function baseH(){return YB()+rowsH()*st.sz}
+const wMin=()=>Math.max(W_MIN,Math.ceil(W_MIN*st.sz));  // bigger text needs a wider gadget
+/* one-line view: no yard; resizable sideways only. Dragging sets a target width (st.lineW);
+   what doesn't fit is trimmed from the end: first session names shorten ("Houdini 2" -> "Hou 2"),
+   then values drop one at a time (a session's RAM, then its CPU with its name). CPU, GPU and RAM
+   always stay. While dragging the bar follows the pointer (the gap is at most one value);
+   on release it glides in to hug what's shown (see glideLine). */
+const LINE_H=28, BTN_W=40, PAD=22;   // BTN_W: view button + resize handle; PAD: 14 left + 8 right
+const natW=items=>Math.ceil((PAD+itemsW(items))*st.sz)+BTN_W;
+const lineMinW=()=>natW(statusItems([]));
+const lineNatW=()=>natW(statusItems(houLines()));    // everything shown: also the widest it gets
+const lineTarget=()=>clamp(st.lineW??Infinity,lineMinW(),lineNatW());
+const lineWidth=()=>natW(lineItems());
+function lineItems(){
+  const avail=(lineTarget()-BTN_W)/st.sz-PAD, items=statusItems(houLines());
+  for(let i=items.length-1;i>=3&&itemsW(items)>avail;i--){                // shorten names first
+    const p=items[i].parts[0];
+    if(p[0].startsWith('Houdini')){p[0]=p[0].replace('Houdini','Hou');items[i].w=itemW(items[i])}
+  }
+  while(items.length>3&&itemsW(items)>avail){
+    const it=items[items.length-1];
+    if(it.parts.length>3){it.parts=it.parts.slice(0,3);it.w=itemW(it)}   // drop its RAM first
+    else items.pop();                                                      // then its CPU and name
+  }
+  return items;
+}
+const GW=()=>isLine()?(st.lineDisp??lineWidth()):st.W;   // current gadget width
+/* the drawn bar width: follows the pointer while dragging, then glides to hug the content */
+const REDUCED=matchMedia('(prefers-reduced-motion: reduce)').matches;
+function glideLine(dt){
+  if(!isLine()) return;
+  const dragging=drag&&drag.mode==='resize', goal=dragging?lineTarget():lineWidth();
+  if(st.lineDisp==null||dragging||REDUCED) st.lineDisp=goal;
+  else{st.lineDisp+=(goal-st.lineDisp)*Math.min(1,dt*14); if(Math.abs(goal-st.lineDisp)<0.3) st.lineDisp=goal}
+}
+/* Houdini: one line per session; more than 3 sessions -> 2 lines + a "+N more" line */
+const HOU_LINE=18, HOU_MAX_LINES=3;
+function houSessions(){
+  const n=st.hou; if(!n) return [];
+  // simulated per-session numbers: the first session does most of the work
+  const share=[[.6,.3],[.25,.12],[.08,.05],[.05,.03]];
+  return share.slice(0,n).map(([c,r],i)=>({name:n===1?'Houdini':'Houdini '+(i+1),cpu:st.cpu*c,ram:st.ram/100*RAM_TOTAL*r}));
+}
+const moreItem=rest=>({name:`+${rest.length} more`,cpu:rest.reduce((a,x)=>a+x.cpu,0),ram:rest.reduce((a,x)=>a+x.ram,0)});
+function houLines(){const s=houSessions();return s.length<=HOU_MAX_LINES?s:[...s.slice(0,2),moreItem(s.slice(2))]}
+function houH(){const k=isLine()?0:houLines().length;return k?H_HOU+(k-1)*HOU_LINE:0}
+/* dot + label/value items packed with fixed gaps (never spread out):
+   compact view shows CPU/GPU/RAM, one-line view adds the Houdini sessions */
+const FONT='700 10px "Segoe UI",system-ui,sans-serif', GAP=12;
+function statusItems(hou){
+  // parts: [text, color, gap before]; hou: the Houdini lines to append
+  const items=rows().map(([l,p,v])=>({dot:level(p),parts:[[l,C.label,0],[v,C.ink,4]]}));
+  hou.forEach(h=>{
+    const more=h.name[0]==='+';
+    items.push({dot:more?null:C.hat,parts:[[h.name,more?C.label:C.hat,0],['CPU',C.label,6],[Math.round(h.cpu)+'%',C.ink,4],['RAM',C.label,8],[ramText(h.ram),C.ink,4]]});
+  });
+  items.forEach(it=>{it.w=itemW(it)});
+  return items;
+}
+function itemW(it){
+  ctx.font=FONT;
+  return (it.dot?10:0)+it.parts.reduce((a,[s,,g])=>a+g+ctx.measureText(s).width,0);
+}
+const itemsW=items=>items.reduce((a,it)=>a+it.w,0)+GAP*(items.length-1);
+function drawItems(items,x,y){
+  items.forEach(it=>{
+    if(it.dot){ell(x+3,y,3,3,it.dot);x+=10}
+    it.parts.forEach(([s,col,g])=>{x+=g;text(s,x,y,col);x+=ctx.measureText(s).width});
+    x+=GAP;
+  });
+}
+function curH(){return baseH()+houH()*st.sz}
+const ramText=gb=>st.pct?Math.round(gb/RAM_TOTAL*100)+'%':gb.toFixed(1)+'G';
+function timePhase(){if(st.sky!=='auto')return st.sky;const h=new Date().getHours();return h>=6&&h<10?'morning':h>=10&&h<17?'day':h>=17&&h<20?'evening':'night'}
+function level(p){return p>=BUSY_AT?C.crit:p>=60?C.warn:C.ok}
+const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+const load=()=>Math.max(st.cpu,st.gpu,st.ram);
+/* RAM warning levels: 1 noticing, 2 uneasy, 3 warning, 4 danger */
+function ramLevel(){const r=st.ram;return r>=95?4:r>=85?3:r>=70?2:r>=50?1:0}
+const RAM_MOOD=['','noticing the RAM (50%+)','uneasy about RAM (70%+)','RAM warning (85%+)','RAM danger (95%+)'];
+
+function fitCanvas(){
+  st.W=clamp(st.W,wMin(),W_MAX);
+  const W=GW(), h=curH(), dpr=window.devicePixelRatio||1, key=[W,h,st.Z,dpr].join('|');
+  if(key===st.fitKey) return; st.fitKey=key;
+  cv.style.width=W*st.Z+'px'; cv.style.height=h*st.Z+'px';
+  cv.width=Math.round(W*st.Z*dpr); cv.height=Math.round(h*st.Z*dpr);
+  ctx.setTransform(st.Z*dpr,0,0,st.Z*dpr,0,0);
+  pet.x=clamp(pet.x,XMIN,XMAX()); if(pet.target!==null) pet.target=clamp(pet.target,XMIN,XMAX());
+  $('size-o').textContent=`Gadget size: ${Math.round(W)} × ${Math.round(h)}`;
+  clampGadget();
+}
+function placeDefault(){gadget.style.left=Math.max(8,stage.clientWidth-GW()*st.Z-20)+'px';gadget.style.top='20px'}
+function clampGadget(){
+  const maxL=stage.clientWidth-gadget.offsetWidth, maxT=stage.clientHeight-gadget.offsetHeight;
+  gadget.style.left=clamp(parseFloat(gadget.style.left)||0,0,Math.max(0,maxL))+'px';
+  gadget.style.top=clamp(parseFloat(gadget.style.top)||0,0,Math.max(0,maxT))+'px';
+}
+
+/* ---------- mood & movement ---------- */
+function updateMood(now){
+  if(load()>=BUSY_AT){mood='busy';calmSince=null;return}
+  if(st.cpu<SLEEP_BELOW&&st.gpu<SLEEP_BELOW){
+    if(calmSince===null) calmSince=now;
+    if(now-calmSince>=SLEEP_AFTER*1000&&pet.target===null){mood='sleep';return}
+  }else calmSince=null;
+  mood='walk';
+}
+function move(dt){
+  if(pet.jumpT>=0){pet.jumpT+=dt;if(pet.jumpT>0.45)pet.jumpT=-1}
+  if(pet.target!==null){
+    const d=pet.target-pet.x; pet.dir=Math.sign(d)||pet.dir;
+    const step=55*dt;
+    if(Math.abs(d)<=step){pet.x=pet.target;pet.target=null;pet.jumpT=0;pet.pause=1.2}
+    else{pet.x+=pet.dir*step;pet.phase+=step*0.28}
+    return;
+  }
+  if(pet.glance>0) pet.glance-=dt;
+  if(mood==='sleep') return;  // busy keeps wandering while casting
+  if(pet.pause>0){pet.pause-=dt;return}
+  if(ramLevel()>=1&&Math.random()<0.18*dt){pet.glance=1.2;pet.pause=1.2;return}
+  const step=28*dt*(ramLevel()>=2?0.6:1); pet.x+=pet.dir*step; pet.phase+=step*0.28;
+  if(pet.x<=XMIN){pet.x=XMIN;pet.dir=1}
+  else if(pet.x>=XMAX()){pet.x=XMAX();pet.dir=-1}
+  else if(Math.random()<0.25*dt) pet.pause=1+Math.random()*2;
+  else if(Math.random()<0.08*dt) pet.dir*=-1;
+}
+function particles(dt){
+  pet.hearts=pet.hearts.filter(h=>(h.t+=dt)<1.1);
+  if(mood==='busy'){
+    const inten=(load()-BUSY_AT)/(100-BUSY_AT);
+    if(Math.random()<(10+inten*22)*dt) pet.sparks.push({x:pet.x+(Math.random()-.5)*34,y:GROUND()+10,t:0,life:.9+Math.random()*.6,s:1+Math.random()*1.4});
+  }
+  pet.sparks=pet.sparks.filter(s=>(s.t+=dt)<s.life);
+}
+
+/* ---------- drawing primitives ---------- */
+function rr(x,y,w,h,r,fill,stroke){ctx.beginPath();ctx.roundRect(x,y,w,h,r);if(fill){ctx.fillStyle=fill;ctx.fill()}if(stroke){ctx.strokeStyle=stroke;ctx.lineWidth=1;ctx.stroke()}}
+function ell(x,y,rx,ry,fill){ctx.beginPath();ctx.ellipse(x,y,rx,ry,0,0,Math.PI*2);ctx.fillStyle=fill;ctx.fill()}
+function line(x0,y0,x1,y1,col,w){ctx.beginPath();ctx.moveTo(x0,y0);ctx.lineTo(x1,y1);ctx.strokeStyle=col;ctx.lineWidth=w;ctx.lineCap='round';ctx.stroke()}
+function text(s,x,y,col,align='left',size=10){
+  ctx.font=`700 ${size}px "Segoe UI",system-ui,sans-serif`;ctx.textAlign=align;ctx.textBaseline='middle';
+  ctx.fillStyle=col;ctx.fillText(s,x,y);
+}
+function star(x,y,r,col,a=1){ctx.save();ctx.globalAlpha=a;ctx.beginPath();for(let i=0;i<8;i++){const rad=i%2?r*.4:r,ang=i*Math.PI/4-Math.PI/2;ctx.lineTo(x+Math.cos(ang)*rad,y+Math.sin(ang)*rad)}ctx.closePath();ctx.fillStyle=col;ctx.fill();ctx.restore()}
+
+/* ---------- drawing: gadget ---------- */
+function drawYard(){
+  const W=st.W, yb=YB(), ph=timePhase(), sky=SKY[ph], g=ctx.createLinearGradient(0,8,0,yb);
+  g.addColorStop(0,sky.top); g.addColorStop(1,sky.bottom);
+  rr(8,8,W-16,st.YH,11,g);
+  ctx.save();ctx.beginPath();ctx.roundRect(8,8,W-16,st.YH,11);ctx.clip();
+  const fx=f=>8+f*(W-16), fy=f=>8+f*st.YH;
+  if(ph==='night'){
+    STARS.forEach(([x,y],i)=>star(fx(x),fy(y),1.6,'#FFF6D8',.35+.45*Math.abs(Math.sin(t*1.3+i))));
+    ell(44,26,7,7,'#FFF0BE'); ell(47.5,24,6,6,sky.top);
+    FLIES.forEach(([x,y,o])=>{const px=fx(x)+Math.sin(t*.7+o)*8, py=fy(y)+Math.cos(t*.9+o)*5, a=.35+.5*Math.abs(Math.sin(t*1.6+o));
+      ctx.save();ctx.globalAlpha=a*.35;ell(px,py,4,4,'#D9F58A');ctx.globalAlpha=a;ell(px,py,1.3,1.3,'#EFFFB0');ctx.restore()});
+  }else if(ph==='morning'){ctx.save();ctx.globalAlpha=.9;ell(40,yb-10,11,11,'#FFD3A1');ctx.restore()}
+  else if(ph==='evening'){ell(52,yb-8,13,13,'#F2A06B')}
+  else{ell(46,26,6,6,'#FFE39C');ctx.globalAlpha=.55;ell(90,26,9,5,'#E8F1F8');ell(99,24,7,5,'#E8F1F8');ell(W-84,38,8,4,'#E8F1F8');ctx.globalAlpha=1}
+  ctx.setLineDash([1,5]);line(18,yb-8,W-18,yb-8,sky.floor,1.5);ctx.setLineDash([]);
+  ctx.restore();
+  return ph;
+}
+/* view button: top-right of the yard, or at the right end of the one-line bar */
+function btnPos(){return isLine()?[GW()-38,(curH()-20)/2]:[st.W-33,10]}
+function drawToggle(){
+  const [x,y]=btnPos();
+  rr(x,y,22,20,6,C.btn,C.edge);
+  if(isLine()) [-4,0,4].forEach(d=>ell(x+11+d,y+10,1.3,1.3,C.label));
+  else (st.view==='compact'?[10]:[6,10,14]).forEach(d=>line(x+6,y+d,x+16,y+d,C.label,1.4));
+}
+function rows(){
+  return [['CPU',st.cpu,st.cpu+'%'],['GPU',st.gpu,st.gpu+'%'],['RAM',st.ram,ramText(st.ram/100*RAM_TOTAL)]];
+}
+function drawRows(){
+  // local units: origin at the top of the status area, width shrinks as the scale grows
+  const s=st.sz, W=GW()/s, yb=0, base=rowsH();
+  ctx.save(); ctx.translate(0,YB()); ctx.scale(s,s);
+  if(isLine()) drawItems(lineItems(),14,yb+LINE_H/2);
+  else if(st.view==='compact') drawItems(statusItems([]),16,yb+16);
+  else{
+    rows().forEach(([l,p,v],i)=>{
+      const y=yb+22+i*19, x0=54, x1=W-62;
+      text(l,16,y,C.label);
+      line(x0,y,x1,y,C.track,7);
+      const glow=l==='RAM'&&ramLevel()>=3;
+      if(glow){ctx.save();ctx.shadowColor=level(p);ctx.shadowBlur=ramLevel()>=4?6+6*Math.abs(Math.sin(t*5)):6}
+      line(x0,y,x0+(x1-x0)*p/100+0.01,y,level(p),7);
+      if(glow) ctx.restore();
+      text(v,W-16,y,C.ink,'right');
+    });
+  }
+  const hl=isLine()?[]:houLines();   // one-line view already shows the sessions on its line
+  if(hl.length) line(16,base-6,W-16,base-6,C.track,1);
+  hl.forEach((h,i)=>{
+    const y=base+8+i*HOU_LINE, more=h.name[0]==='+', hc=Math.round(h.cpu)+'%', hr=ramText(h.ram);
+    if(!more) ell(19,y,3,3,C.hat);
+    text(h.name,more?16:27,y,more?C.label:C.hat);
+    ctx.font='700 10px "Segoe UI",system-ui,sans-serif';
+    let x=W-16; text(hr,x,y,C.ink,'right'); x-=ctx.measureText(hr).width+4;
+    text('RAM',x,y,C.label,'right'); x-=ctx.measureText('RAM').width+12;
+    text(hc,x,y,C.ink,'right'); x-=ctx.measureText(hc).width+4;
+    text('CPU',x,y,C.label,'right');
+  });
+  ctx.restore();
+}
+function drawGrip(){
+  if(isLine()){                     // one-line view: a sideways handle at the right end
+    if(st.clear?!st.hover:!hoverGrip&&!(drag&&drag.mode==='resize')) return;
+    const x=GW()-7, m=curH()/2;
+    [-1.5,1.5].forEach(d=>line(x+d,m-4,x+d,m+4,C.label,1.2));
+    return;
+  }
+  const W=st.W, H=curH();
+  // transparent mode: the grip shows only while the panel is revealed by pointing at the gadget
+  if(st.clear?!st.hover:!hoverGrip&&!(drag&&drag.mode==='resize')) return;
+  [[4,10],[4,6]].forEach(([a,b])=>line(W-b,H-a,W-a,H-b,C.label,1.3));
+  line(W-14,H-4,W-4,H-14,C.label,1.3);
+}
+function drawMagicCircle(x,inten){
+  const a=t*(1.2+inten*2.5), cy=GROUND()+13, glow=ctx.createRadialGradient(x,cy,2,x,cy,26);
+  glow.addColorStop(0,`rgba(185,168,255,${.28+inten*.3})`);glow.addColorStop(1,'rgba(185,168,255,0)');
+  ctx.fillStyle=glow;ctx.beginPath();ctx.ellipse(x,cy,26,7,0,0,Math.PI*2);ctx.fill();
+  ctx.lineWidth=1.2;ctx.strokeStyle=C.magic;
+  ctx.beginPath();ctx.ellipse(x,cy,21,5.2,0,0,Math.PI*2);ctx.stroke();
+  ctx.beginPath();ctx.ellipse(x,cy,13,3.2,0,0,Math.PI*2);ctx.stroke();
+  for(let k=0;k<8;k++){const g=a+k*Math.PI/4;ell(x+Math.cos(g)*17,cy+Math.sin(g)*4.2,1.2,1.2,C.magic)}
+}
+function drawSign(sx,sy,lvl){
+  const danger=lvl>=4, p=danger?1+Math.sin(t*10)*.08:1, w=(danger?20:14)*p, h=13*p;
+  line(sx,sy+h/2,sx,sy+h/2+11,C.wand,1.4);
+  rr(sx-w/2,sy-h/2,w,h,4,danger?C.crit:C.warn);
+  text(danger?'!!':'!',sx,sy+.5,'#1E1B26','center',10);
+}
+function drawHat(x,base){
+  ctx.beginPath();ctx.moveTo(x-8,base);ctx.lineTo(x+9,base);ctx.lineTo(x+4,base-17);ctx.lineTo(x-1,base-16);ctx.closePath();ctx.fillStyle=C.hat;ctx.fill();
+  ell(x+.5,base,10,2.2,C.hat); star(x+2,base-7,2.6,C.star);
+}
+function drawPet(){
+  const lvl=ramLevel(), x=pet.x, d=pet.dir, gy=GROUND(), walking=pet.target!==null||(mood!=='sleep'&&pet.pause<=0);
+  const casting=mood==='busy', inten=Math.max(0,(load()-BUSY_AT)/(100-BUSY_AT));
+  const jump=pet.jumpT>=0?Math.sin(Math.PI*pet.jumpT/.45)*11:0;
+  const bob=walking?-Math.abs(Math.sin(pet.phase))*2:casting?Math.sin(t*2)*1-1.5:0;  // slow float when pausing mid-spell
+  const y=gy+bob-jump;
+  if(casting) drawMagicCircle(x,inten);
+  ctx.strokeStyle=C.eye;ctx.lineCap='round';
+  if(mood==='sleep'&&pet.target===null&&jump===0){
+    const sy=gy+2;
+    ell(x,sy,12,8,C.pet);
+    ctx.lineWidth=1.3;
+    [-4,4].forEach(ex=>{ctx.beginPath();ctx.moveTo(x+ex-2,sy);ctx.quadraticCurveTo(x+ex,sy+2.5,x+ex+2,sy);ctx.stroke()});
+    const zt=(t%2.4)/2.4;
+    ctx.globalAlpha=1-zt*.6;text('z',x+12+zt*4,sy-8-zt*8,C.z,'left',8);text('Z',x+19+zt*4,sy-16-zt*8,C.z,'left',10);ctx.globalAlpha=1;
+    if(st.hou) drawHat(x,sy-6);
+    return;
+  }
+  const step=walking?Math.sin(pet.phase*2)*2:0;
+  ell(x-5+step,gy+9.5-jump*.6,2,2.4,C.petDark); ell(x+5-step,gy+9.5-jump*.6,2,2.4,C.petDark);
+  ell(x,y,11,9,C.pet);
+  const ex=casting?0:d*1.2;
+  if(casting||pet.hearts.length){
+    ctx.lineWidth=1.3;
+    [-3.5,3.5].forEach(o=>{ctx.beginPath();ctx.moveTo(x+o+ex-1.8,y-.5);ctx.quadraticCurveTo(x+o+ex,y-3.2,x+o+ex+1.8,y-.5);ctx.stroke()});
+    ell(x-6+ex,y+3,2,1.2,C.cheek); ell(x+6+ex,y+3,2,1.2,C.cheek);
+  }else{
+    const gdy=pet.glance>0?1.3:0;  // glancing down at the bars
+    ell(x-3.5+ex,y-1.5+gdy,1.5,1.5,C.eye); ell(x+3.5+ex,y-1.5+gdy,1.5,1.5,C.eye);
+  }
+  ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(x-2+ex,y+2.5);ctx.quadraticCurveTo(x+ex,y+4.5,x+2+ex,y+2.5);ctx.stroke();
+  if(lvl>=2){const sx=x-d*12;ctx.beginPath();ctx.moveTo(sx,y-12);ctx.quadraticCurveTo(sx+3,y-6,sx,y-4.5);ctx.quadraticCurveTo(sx-3,y-6,sx,y-12);ctx.fillStyle='#7DB8F0';ctx.fill()}
+  if(lvl>=3) drawSign(x-d*17,y-30,lvl);
+  if(st.hou){
+    drawHat(x,y-8);
+    if(casting){
+      const w=Math.sin(t*3)*2, tx=x+d*21, ty=y-9+w;  // slow, gentle wand sway
+      line(x+d*10,y+3,tx,ty,C.wand,1.6);
+      star(tx+d*2,ty-3,3.2,C.star,.6+.4*Math.abs(Math.sin(t*8)));
+    }
+  }
+}
+function drawParticles(){
+  pet.sparks.forEach(s=>{const k=s.t/s.life;star(s.x,s.y-k*48,s.s*2,k<.5?C.star:C.magic,1-k)});
+  pet.hearts.forEach(h=>{if(h.t<0)return;const k=h.t/1.1;ctx.save();ctx.globalAlpha=1-k;ctx.fillStyle=C.heart;
+    const x=h.x+Math.sin(k*6+h.o)*3, y=h.y-k*26, s=3.2;
+    ctx.beginPath();ctx.moveTo(x,y+s);ctx.bezierCurveTo(x-s*2,y-s*.4,x-s*.8,y-s*1.8,x,y-s*.6);ctx.bezierCurveTo(x+s*.8,y-s*1.8,x+s*2,y-s*.4,x,y+s);ctx.fill();ctx.restore()});
+}
+function draw(){
+  fitCanvas();
+  const W=GW(), h=curH();
+  ctx.clearRect(0,0,W,h);
+  const danger=ramLevel()>=4;
+  // transparent mode: the panel is still there, just hidden until the pointer is over the gadget
+  if(!st.clear||st.hover) rr(.5,.5,W-1,h-1,16,C.panel,danger?`rgba(240,139,126,${.45+.45*Math.abs(Math.sin(t*5))})`:C.edge);
+  if(YB()) drawYard();
+  drawRows();
+  if(st.pet||isLine()) drawToggle();   // after the rows: covers text for the moment a growing bar glides open
+  drawGrip();
+  if(!YB()) return;
+  ctx.save();ctx.beginPath();ctx.roundRect(8,8,W-16,st.YH,11);ctx.rect(0,0,W,8);ctx.clip();
+  drawPet(); drawParticles(); ctx.restore();
+}
+function moodText(){
+  if(isLine()) return `View: <b>One line</b> (no pet; drag its right end to resize sideways)${st.clear?'<br>Transparent background: point at the gadget to show its panel':''}`;
+  if(!st.pet) return `Pet: <b>hidden</b> (status only${st.clear?', transparent background: point at the gadget to show its panel':''})`;
+  const m=mood==='busy'?'<b>Casting magic while wandering</b> (CPU, GPU or RAM at 85% or more)'
+    :mood==='sleep'?'<b>Dozing</b> (click the yard or the pet to wake it)'
+    :(st.cpu<SLEEP_BELOW&&st.gpu<SLEEP_BELOW&&calmSince!==null)?'Idle… <b>about to doze off</b>'
+    :'<b>Wandering around</b>';
+  const lv=ramLevel(), mem=lv?`<br>Memory: <b>${RAM_MOOD[lv]}</b>`:'';
+  return `Pet now: ${m}${st.hou?' · wearing the wizard hat':''}${mem}<br><span style="font-size:13px;opacity:.8">Yard: ${PHASE_NAME[timePhase()]}</span>`;
+}
+let lastMood='';
+function frame(now){
+  const dt=Math.min((now-last)/1000,.1); last=now; t+=dt;
+  updateMood(now); if(YB()){move(dt);particles(dt)} glideLine(dt); draw();
+  const mt=moodText(); if(mt!==lastMood){$('mood').innerHTML=mt;lastMood=mt}
+  requestAnimationFrame(frame);
+}
+
+/* ---------- input: move / resize / click ---------- */
+let drag=null;
+function localPoint(e){const r=cv.getBoundingClientRect();return [(e.clientX-r.left)/st.Z,(e.clientY-r.top)/st.Z]}
+function inGrip(x,y){return isLine()?x>=GW()-12:x>=st.W-18&&y>=curH()-18}
+/* transparent mode: clicks on empty (fully transparent) pixels pass through, like the real window */
+function solidAt(e){
+  if(!st.clear) return true;
+  const r=cv.getBoundingClientRect(), k=cv.width/r.width;
+  return ctx.getImageData(Math.floor((e.clientX-r.left)*k),Math.floor((e.clientY-r.top)*k),1,1).data[3]>0;
+}
+cv.addEventListener('pointerdown',e=>{
+  if(e.button!==0)return; closeMenu();
+  if(!solidAt(e)) return;
+  const [x,y]=localPoint(e);
+  drag={mode:inGrip(x,y)?'resize':'move',sx:e.clientX,sy:e.clientY,l:gadget.offsetLeft,t:gadget.offsetTop,W:st.W,YH:st.YH,LW:lineTarget(),moved:false};
+  cv.setPointerCapture(e.pointerId);
+});
+cv.addEventListener('pointermove',e=>{
+  if(!drag){const [x,y]=localPoint(e);hoverGrip=inGrip(x,y);cv.classList.toggle('resize',hoverGrip&&!isLine());cv.classList.toggle('resize-x',hoverGrip&&isLine());return}
+  const dx=e.clientX-drag.sx, dy=e.clientY-drag.sy;
+  if(Math.abs(dx)+Math.abs(dy)>3) drag.moved=true;
+  if(!drag.moved) return;
+  if(drag.mode==='resize'){
+    if(isLine()) st.lineW=clamp(drag.LW+dx/st.Z,lineMinW(),lineNatW());   // sideways only
+    else{
+      st.W=clamp(drag.W+dx/st.Z,wMin(),W_MAX);
+      if(st.pet) st.YH=clamp(drag.YH+dy/st.Z,YH_MIN,YH_MAX);
+    }
+  }else{gadget.style.left=drag.l+dx+'px';gadget.style.top=drag.t+dy+'px';clampGadget()}
+});
+/* pointing anywhere inside the gadget's box counts as hovering (the real tool checks the cursor against the window) */
+cv.addEventListener('pointerenter',()=>{st.hover=true});
+cv.addEventListener('pointerleave',()=>{if(!drag){st.hover=false;hoverGrip=false;cv.classList.remove('resize','resize-x')}});
+cv.addEventListener('pointerup',e=>{
+  if(!drag)return; const {moved,mode}=drag; drag=null;
+  if(mode==='resize'&&isLine()) st.lineW=lineWidth();   // keep the snapped width, so the next drag starts where the bar ends
+  if(moved||mode==='resize')return;
+  const [x,y]=localPoint(e);
+  const [bx,by]=btnPos();
+  if((st.pet||isLine())&&x>=bx-2&&x<=bx+24&&y>=by-2&&y<=by+22){st.view={full:'compact',compact:'line',line:'full'}[st.view];return}
+  // numbers: right-hand values in the full view, anywhere on the line in compact / one-line / Houdini rows
+  if(y>YB()&&(st.view!=='full'||y>baseH()-6*st.sz||x>=st.W-70*st.sz)){st.pct=!st.pct;return}
+  if(!YB()) return;
+  const py=mood==='sleep'?GROUND()+2:GROUND();
+  if(Math.hypot(x-pet.x,y-py)<15){
+    pet.jumpT=0; pet.pause=1.5; calmSince=performance.now();
+    for(let i=0;i<3;i++) pet.hearts.push({x:pet.x+(i-1)*7,y:py-12-i*2,t:-i*.12,o:i*2});
+    return;
+  }
+  if(x>=8&&x<=st.W-8&&y>=8&&y<=YB()){pet.target=clamp(x,XMIN,XMAX());calmSince=performance.now()}
+});
+
+/* ---------- right-click menu ---------- */
+const menu=document.createElement('div');menu.className='menu';menu.hidden=true;stage.appendChild(menu);
+function renderMenu(){
+  menu.innerHTML=`<button data-a="top"><span>Always on top</span><span>${st.topmost?'✓':''}</span></button>
+    <hr><button data-a="v-full"><span>Full view</span><span>${st.view==='full'?'✓':''}</span></button>
+    <button data-a="v-compact"><span>Compact view</span><span>${st.view==='compact'?'✓':''}</span></button>
+    <button data-a="v-line"><span>One line</span><span>${st.view==='line'?'✓':''}</span></button><hr>
+    <button data-a="pct"><span>Show RAM as %</span><span>${st.pct?'✓':''}</span></button>
+    <button data-a="pet"><span>Show pet</span><span>${st.pet?'✓':''}</span></button>
+    <button data-a="clear"><span>Transparent background</span><span>${st.clear?'✓':''}</span></button>
+    <button data-a="settings"><span>Settings…</span></button><hr>
+    <button data-a="reset"><span>Reset position</span></button>
+    <button data-a="size"><span>Reset size</span></button><hr><button data-a="quit"><span>Quit</span></button>`;
+}
+function closeMenu(){menu.hidden=true}
+cv.addEventListener('contextmenu',e=>{
+  e.preventDefault(); if(!solidAt(e)) return; renderMenu(); menu.hidden=false;
+  const s=stage.getBoundingClientRect();
+  menu.style.left=Math.min(e.clientX-s.left,stage.clientWidth-menu.offsetWidth-6)+'px';
+  menu.style.top=Math.min(e.clientY-s.top,stage.clientHeight-menu.offsetHeight-6)+'px';
+});
+menu.addEventListener('click',e=>{
+  const a=e.target.closest('button')?.dataset.a; if(!a)return;
+  if(a==='top')st.topmost=!st.topmost;
+  if(a.startsWith('v-'))st.view=a.slice(2);
+  if(a==='pct')st.pct=!st.pct;
+  if(a==='pet')setOpt('pet',!st.pet);
+  if(a==='clear')setOpt('clear',!st.clear);
+  if(a==='settings'){$('settings').hidden=false;$('opt-size').focus()}
+  if(a==='reset')placeDefault();
+  if(a==='size'){st.W=W_DEF;st.YH=YH_DEF;st.lineW=null;setSize(100)}
+  if(a==='quit'){gadget.hidden=true;$('reopen').hidden=false}
+  closeMenu();
+});
+
+/* ---------- settings window ---------- */
+function setOpt(k,v){st[k]=v;$('opt-'+k).checked=v}
+function setSize(pct){st.sz=pct/100;$('opt-size').value=pct;$('opt-size-o').textContent=pct+'%';st.W=Math.max(st.W,wMin())}
+$('opt-size').addEventListener('input',e=>setSize(+e.target.value));
+$('opt-pet').addEventListener('change',e=>setOpt('pet',e.target.checked));
+$('opt-clear').addEventListener('change',e=>setOpt('clear',e.target.checked));
+$('set-close').addEventListener('click',()=>{$('settings').hidden=true});
+/* drag the settings window by its title row, kept inside the desktop area */
+(()=>{
+  const dlg=$('settings'), head=dlg.querySelector('.dlg-head'); let d=null;
+  head.addEventListener('pointerdown',e=>{
+    if(e.button!==0||e.target.closest('button'))return;
+    d={sx:e.clientX,sy:e.clientY,l:dlg.offsetLeft,t:dlg.offsetTop}; head.setPointerCapture(e.pointerId);
+  });
+  head.addEventListener('pointermove',e=>{
+    if(!d)return;
+    dlg.style.bottom='auto';
+    dlg.style.left=clamp(d.l+e.clientX-d.sx,0,stage.clientWidth-dlg.offsetWidth)+'px';
+    dlg.style.top=clamp(d.t+e.clientY-d.sy,0,stage.clientHeight-dlg.offsetHeight)+'px';
+  });
+  head.addEventListener('pointerup',()=>{d=null});
+})();
+$('wall-seg').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;segSelect($('wall-seg'),b);stage.classList.toggle('bright',b.dataset.w==='bright')});
+document.addEventListener('pointerdown',e=>{if(!menu.contains(e.target)&&e.target!==cv)closeMenu()});
+$('reopen').addEventListener('click',()=>{gadget.hidden=false;$('reopen').hidden=true;placeDefault()});
+
+/* ---------- test controls ---------- */
+function syncSliders(){
+  ['cpu','gpu','ram'].forEach(k=>{st[k]=+$(k).value;$(k+'-o').textContent=k==='ram'?(st.ram/100*RAM_TOTAL).toFixed(1)+' GB':st[k]+'%'});
+}
+['cpu','gpu','ram'].forEach(k=>$(k).addEventListener('input',syncSliders));
+function segSelect(seg,btn){seg.querySelectorAll('button').forEach(b=>b.setAttribute('aria-pressed',b===btn))}
+$('hou-seg').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;segSelect($('hou-seg'),b);st.hou=+b.dataset.hou});
+$('presets').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;const [c,g,r]=b.dataset.p.split(',');$('cpu').value=c;$('gpu').value=g;$('ram').value=r;syncSliders()});
+$('sky-seg').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;segSelect($('sky-seg'),b);st.sky=b.dataset.s});
+$('zoom-seg').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;segSelect($('zoom-seg'),b);st.Z=+b.dataset.z;fitCanvas();placeDefault()});
+addEventListener('resize',clampGadget);
+
+syncSliders(); fitCanvas(); placeDefault(); requestAnimationFrame(frame);
+</script>

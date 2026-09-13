@@ -1,0 +1,13 @@
+# Personal window position, size and options (each PC makes its own)
+settings.json
+
+# Personal working notes for Claude (kept local)
+CLAUDE.md
+
+# Test harness output
+tools/settings_test.json
+tools/sheet.png
+
+# Python cache
+__pycache__/
+*.pyc
