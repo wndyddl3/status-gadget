@@ -41,6 +41,10 @@ Only one copy runs at a time. To start it with Windows, put a shortcut to `statu
 
 Your window position and options are saved in `settings.json` next to the script.
 
+## Coming soon
+
+- **More DCC apps:** CPU and memory for other open DCC apps, shown like the Houdini rows today: Maya, Nuke, Blender, Unreal Engine, 3ds Max and Cinema 4D. The pet will wear a different hat for each app.
+
 ## Files
 
 - `status_gadget.pyw`: the gadget (window, pet, drawing)
